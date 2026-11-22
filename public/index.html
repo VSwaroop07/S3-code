@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>S3 File Manager</title>
+  <style>
+    body{font-family:Arial;max-width:760px;margin:40px auto;padding:0 16px}
+    button{padding:8px 12px;margin:5px;cursor:pointer}
+    li{margin:12px 0;word-break:break-all}
+  </style>
+</head>
+<body>
+  <h1>Amazon S3 File Manager</h1>
+  <form id="uploadForm">
+    <input type="file" name="file" required>
+    <button>Upload to S3</button>
+  </form>
+  <p id="status"></p>
+  <h2>Stored files</h2>
+  <button onclick="loadFiles()">Refresh list</button>
+  <ul id="files"></ul>
+  <script>
+    const statusBox = document.getElementById("status");
+    async function loadFiles() {
+      const response = await fetch("/api/files");
+      const files = await response.json();
+      const list = document.getElementById("files");
+      list.innerHTML = "";
+      files.forEach(file => {
+        const li = document.createElement("li");
+        const name = document.createTextNode(`${file.key} (${file.size} bytes) `);
+        li.appendChild(name);
+        const download = document.createElement("button");
+        download.textContent = "Download";
+        download.onclick = async () => {
+          const r = await fetch("/api/download/" + encodeURIComponent(file.key));
+          const data = await r.json();
+          window.open(data.url, "_blank");
+        };
+        const del = document.createElement("button");
+        del.textContent = "Delete";
+        del.onclick = async () => {
+          await fetch("/api/files/" + encodeURIComponent(file.key), {method:"DELETE"});
+          loadFiles();
+        };
+        li.append(download, del);
+        list.appendChild(li);
+      });
+    }
+    document.getElementById("uploadForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      statusBox.textContent = "Uploading...";
+      const response = await fetch("/api/upload", {method:"POST", body:new FormData(e.target)});
+      const data = await response.json();
+      statusBox.textContent = data.message || "Request completed";
+      if (response.ok) { e.target.reset(); loadFiles(); }
+    });
+    loadFiles();
+  </script>
+</body>
+</html>
